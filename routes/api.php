@@ -12,7 +12,14 @@ Route::group([], function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
 
         Route::get('/user', function (Request $request) {
-            return $request->user();
+            return response()->json([
+                'success' => true,
+                'data' => $request->user(),
+                'meta' => [
+                    'request_id' => $request->attributes->get('request_id'),
+                    'timestamp' => now('UTC')->toIso8601String(),
+                ],
+            ]);
         });
     });
 });
