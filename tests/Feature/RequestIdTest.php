@@ -13,17 +13,17 @@ class RequestIdTest extends TestCase
     private function loginPayload(): array
     {
         User::factory()->create([
+            'username' => 'req.ulimbo',
             'email' => 'utilizador@ulimbotech.com',
-            'password' => 'Password-Segura-2026',
+            'password' => bcrypt('Password-Segura-2026'),
         ]);
 
         return [
-            'email' => 'utilizador@ulimbotech.com',
+            'login' => 'req.ulimbo',
             'password' => 'Password-Segura-2026',
             'device_name' => 'Teste',
         ];
     }
-
     public function test_valid_request_id_is_preserved_in_header_and_meta(): void
     {
         $this->withHeader('X-Request-ID', 'GATEWAY-REQ-001')

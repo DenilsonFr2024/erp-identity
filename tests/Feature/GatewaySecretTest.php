@@ -13,12 +13,13 @@ class GatewaySecretTest extends TestCase
     private function login()
     {
         User::factory()->create([
+            'username' => 'g.ulimbo',
             'email' => 'g@ulimbotech.com',
-            'password' => 'Password-Segura-2026',
+            'password' => bcrypt('Password-Segura-2026'),
         ]);
 
         return $this->postJson('/api/login', [
-            'email' => 'g@ulimbotech.com',
+            'login' => 'g@ulimbotech.com',       // <-- era 'email'
             'password' => 'Password-Segura-2026',
             'device_name' => 'Teste',
         ]);
