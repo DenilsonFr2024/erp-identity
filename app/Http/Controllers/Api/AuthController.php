@@ -195,4 +195,28 @@ class AuthController extends Controller
             ],
         ], 401);
     }
+
+    public function refresh(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Apagar TODOS os tokens do utilizador (ou só o atual, se preferires)
+        $user->tokens()->delete();
+
+        // Criar um novo token com o mesmo device_name
+        $deviceName = $request->input('device_name', 'api');
+        $newToken = $user->createToken($deviceName);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'token' => $newToken->plainTextToken,
+                'token_type' => 'Bearer',
+            ],
+            'meta' => [
+                'request_id' => $request->attributes->get('request_id'),
+                'timestamp' => now('UTC')->toIso8601String(),
+            ],
+        ]);
+    }
 }
