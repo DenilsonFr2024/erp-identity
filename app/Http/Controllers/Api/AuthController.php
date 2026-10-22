@@ -182,7 +182,79 @@ class AuthController extends Controller
             ],
         ]);
     }
+    public function approveUser(Request $request, string $userId): JsonResponse
+    {
+        $admin = $request->user();
 
+        // Verificar se o admin tem a role ulimbo_admin
+        if (! $admin->roles()->where('name', 'ulimbo_admin')->exists()) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => [
+                    'code' => 'FORBIDDEN',
+                    'message' => 'Apenas administradores Ulimbo podem aprovar utilizadores.',
+                    'details' => null,
+                ],
+                'meta' => [
+                    'request_id' => $request->attributes->get('request_id'),
+                    'timestamp' => now('UTC')->toIso8601String(),
+                ],
+            ], 403);
+        }
+
+        $user = User::where('user_id', $userId)->first();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => [
+                    'code' => 'USER_NOT_FOUND',
+                    'message' => 'Utilizador não encontrado.',
+                    'details' => null,
+                ],
+                'meta' => [
+                    'request_id' => $request->attributes->get('request_id'),
+                    'timestamp' => now('UTC')->toIso8601String(),
+                ],
+            ], 404);
+        }
+
+        if ($user->status === 'active') {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'user_id' => $user->user_id,
+                    'username' => $user->username,
+                    'status' => $user->status,
+                    'message' => 'Utilizador já está ativo.',
+                ],
+                'meta' => [
+                    'request_id' => $request->attributes->get('request_id'),
+                    'timestamp' => now('UTC')->toIso8601String(),
+                ],
+            ]);
+        }
+
+        $user->update(['status' => 'active']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user_id' => $user->user_id,
+                'username' => $user->username,
+                'email' => $user->email,
+                'account_type' => $user->account_type,
+                'status' => $user->status,
+                'message' => 'Utilizador aprovado com sucesso.',
+            ],
+            'meta' => [
+                'request_id' => $request->attributes->get('request_id'),
+                'timestamp' => now('UTC')->toIso8601String(),
+            ],
+        ]);
+    }
     private function invalidCredentials(Request $request): JsonResponse
     {
         return response()->json([

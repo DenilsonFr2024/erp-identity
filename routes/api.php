@@ -14,6 +14,7 @@ Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
+    Route::post('/admin/approve-user/{user_id}', [AuthController::class, 'approveUser']);
     Route::post('/password/change', [AuthController::class, 'changePassword']);
     Route::get('/user', fn(Request $request) => response()->json([
         'success' => true,
