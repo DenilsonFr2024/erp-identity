@@ -13,7 +13,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\RateLimiter; // no topo
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+use Illuminate\Auth\Events\PasswordReset;
+
 class AuthController extends Controller
 {
     public function register(Request $request): JsonResponse
@@ -213,6 +217,142 @@ class AuthController extends Controller
                 'token' => $newToken->plainTextToken,
                 'token_type' => 'Bearer',
             ],
+            'meta' => [
+                'request_id' => $request->attributes->get('request_id'),
+                'timestamp' => now('UTC')->toIso8601String(),
+            ],
+        ]);
+    }
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => ['required', 'email'],
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        $status = Password::sendResetLink(
+            $request->only('email')
+        );
+
+        if ($status === Password::RESET_LINK_SENT) {
+            return response()->json([
+                'success' => true,
+                'data' => ['message' => 'Email de recuperação enviado.'],
+                'meta' => [
+                    'request_id' => $request->attributes->get('request_id'),
+                    'timestamp' => now('UTC')->toIso8601String(),
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'data' => null,
+            'error' => [
+                'code' => 'RESET_LINK_FAILED',
+                'message' => 'Não foi possível enviar o email de recuperação.',
+                'details' => ['status' => $status],
+            ],
+            'meta' => [
+                'request_id' => $request->attributes->get('request_id'),
+                'timestamp' => now('UTC')->toIso8601String(),
+            ],
+        ], 400);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->setRememberToken(Str::random(60));
+
+                $user->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
+                'success' => true,
+                'data' => ['message' => 'Password redefinida com sucesso.'],
+                'meta' => [
+                    'request_id' => $request->attributes->get('request_id'),
+                    'timestamp' => now('UTC')->toIso8601String(),
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'data' => null,
+            'error' => [
+                'code' => 'PASSWORD_RESET_FAILED',
+                'message' => 'Não foi possível redefinir a password.',
+                'details' => ['status' => $status],
+            ],
+            'meta' => [
+                'request_id' => $request->attributes->get('request_id'),
+                'timestamp' => now('UTC')->toIso8601String(),
+            ],
+        ], 400);
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        $user = $request->user();
+
+        if (! Hash::check($request->input('current_password'), $user->password)) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => [
+                    'code' => 'INVALID_CURRENT_PASSWORD',
+                    'message' => 'A password atual está incorreta.',
+                    'details' => null,
+                ],
+                'meta' => [
+                    'request_id' => $request->attributes->get('request_id'),
+                    'timestamp' => now('UTC')->toIso8601String(),
+                ],
+            ], 422);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($request->input('password')),
+        ])->save();
+
+        // Revogar todos os tokens (forçar novo login)
+        $user->tokens()->delete();
+
+        return response()->json([
+            'success' => true,
+            'data' => ['message' => 'Password alterada com sucesso. Faça login novamente.'],
             'meta' => [
                 'request_id' => $request->attributes->get('request_id'),
                 'timestamp' => now('UTC')->toIso8601String(),

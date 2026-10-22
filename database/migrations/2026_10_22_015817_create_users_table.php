@@ -17,7 +17,7 @@ return new class extends Migration
             $table->enum('status', ['active', 'pending_approval', 'suspended', 'inactive'])
                 ->default('pending_approval');
             $table->timestamps();
-
+            $table->rememberToken();
             $table->index('account_type');
             $table->index('status');
         });
